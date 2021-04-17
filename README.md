@@ -11,6 +11,9 @@ Provides [OpenCensus](https://github.com/opencensus-integrations) exporter suppo
 
 ![Sentry Trace](./sentry-trace.png)
 
+OpenCensus has tracing instrumentations for a variety of technologies (databases, services, caches, etc...), this library
+enables those instrumentations for Sentry performance tools with zero effort.
+
 ## Usage
 
 ```go
@@ -47,7 +50,7 @@ func main() {
 
 	// Enable Sentry exporter.
 	trace.RegisterExporter(sentry.NewExporter())
-	
+
 	// Use OpenCensus integrations.
 }
 
