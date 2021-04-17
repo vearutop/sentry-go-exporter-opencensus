@@ -3,14 +3,14 @@ package sentry_test
 import (
 	"bytes"
 	"context"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
-	sentry2 "github.com/getsentry/sentry-go"
+	sen "github.com/getsentry/sentry-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swaggest/assertjson"
@@ -23,7 +23,7 @@ func TestNewExporter(t *testing.T) {
 		assert.Equal(t, "/api/123123/envelope/", r.URL.String())
 		assert.Equal(t, http.MethodPost, r.Method)
 
-		b, err := io.ReadAll(r.Body)
+		b, err := ioutil.ReadAll(r.Body)
 		assert.NoError(t, err)
 
 		lines := bytes.Split(b, []byte("\n"))
@@ -74,12 +74,12 @@ func TestNewExporter(t *testing.T) {
 	u.User = url.UserPassword("foo", "")
 	u.Path = "123123"
 
-	assert.NoError(t, sentry2.Init(sentry2.ClientOptions{
+	assert.NoError(t, sen.Init(sen.ClientOptions{
 		Dsn: u.String(),
 	}))
 
 	defer func() {
-		sentry2.Flush(time.Second)
+		sen.Flush(time.Second)
 	}()
 
 	e := sentry.NewExporter()
@@ -103,4 +103,33 @@ func TestNewExporter(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	s1.End()
+}
+
+func BenchmarkExporter_ExportSpan(b *testing.B) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	u, err := url.Parse(srv.URL)
+	require.NoError(b, err)
+
+	u.User = url.UserPassword("foo", "")
+	u.Path = "123123"
+
+	e := sentry.NewExporter()
+	trace.RegisterExporter(e)
+
+	defer func() { trace.UnregisterExporter(e) }()
+	trace.ApplyConfig(trace.Config{
+		DefaultSampler: trace.AlwaysSample(),
+	})
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i <= b.N; i++ {
+		ctx, s1 := trace.StartSpan(context.Background(), "s1")
+		_, s2 := trace.StartSpan(ctx, "s2")
+		s2.End()
+		s1.End()
+	}
 }
